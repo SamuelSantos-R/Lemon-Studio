@@ -15,7 +15,8 @@ env:
 
 jobs:
   app:
-    runs-on: macos-latest
+    # Intel runner: the app is built for x86_64 Macs.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
