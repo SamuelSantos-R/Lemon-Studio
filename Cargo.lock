@@ -2021,6 +2021,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lemon-note-id"
+version = "0.0.1"
+dependencies = [
+ "nih_plug",
+ "os-plugkit",
+ "os-theme",
+ "os-ui",
+]
+
+[[package]]
 name = "lemon-parametric-eq-2"
 version = "0.0.1"
 dependencies = [
@@ -2973,6 +2983,7 @@ dependencies = [
  "lemon-flanger",
  "lemon-formula-controller",
  "lemon-limiter",
+ "lemon-note-id",
  "lemon-parametric-eq-2",
  "lemon-peak-controller",
  "lemon-phaser",

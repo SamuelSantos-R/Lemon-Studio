@@ -1,0 +1,20 @@
+[package]
+name = "lemon-note-id"
+description = "Lemon Note ID: pitch detector with 808 bass and melody note suggestions as a VST3 / CLAP plugin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+doctest = false
+test = false
+
+[features]
+linked = []
+
+[dependencies]
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default-features = false, features = ["vst3"] }
+os-plugkit = { path = "../../crates/os-plugkit" }
+os-ui = { path = "../../crates/os-ui" }
+os-theme = { path = "../../crates/os-theme" }
