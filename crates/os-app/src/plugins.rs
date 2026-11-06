@@ -391,7 +391,7 @@ pub fn builtin_effects() -> Vec<Available> {
         &lemon_peak_controller::LINKED_CLAP_ENTRY as *const _ as *const std::ffi::c_void,
         &lemon_formula_controller::LINKED_CLAP_ENTRY as *const _ as *const std::ffi::c_void,
         &lemon_vocoder::LINKED_CLAP_ENTRY as *const _ as *const std::ffi::c_void,
-        &lemon_note_id::LINKED_CLAP_ENTRY as *const _ as *const std::ffi::c_void,
+        &sample_killer::LINKED_CLAP_ENTRY as *const _ as *const std::ffi::c_void,
     ];
     let names = FILE_MAPPED.into_iter().chain(LINKED_EFFECTS);
     LIBS.iter().zip(entries).zip(names).flat_map(|((lib, entry), name)| linked(lib, entry, name)).collect()
@@ -1540,7 +1540,7 @@ pub const LINKED_EFFECTS: [&str; 18] = [
     LEMON_PEAK_CONTROLLER,
     LEMON_FORMULA_CONTROLLER,
     LEMON_VOCODER,
-    "Lemon Note ID",
+    "Sample Killer",
 ];
 /// Lemon Studio's effects compiled in that a project stores under the FL plugin they recreate, with that plugin's
 /// state (`new_slot`, `store_builtin_states`), so they are never saved wrapped.

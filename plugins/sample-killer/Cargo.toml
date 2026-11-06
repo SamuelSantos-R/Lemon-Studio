@@ -1,6 +1,6 @@
 [package]
-name = "lemon-note-id"
-description = "Lemon Note ID: pitch detector with 808 bass and melody note suggestions as a VST3 / CLAP plugin"
+name = "sample-killer"
+description = "Sample Killer: finds a sample's key and suggests the 808 and melody notes that fit, as a VST3 / CLAP plugin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,6 @@ license.workspace = true
 [lib]
 crate-type = ["cdylib", "lib"]
 doctest = false
-test = false
 
 [features]
 linked = []
@@ -20,4 +19,4 @@ os-ui = { path = "../../crates/os-ui" }
 os-theme = { path = "../../crates/os-theme" }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Controls", "Win32_System_LibraryLoader"] }

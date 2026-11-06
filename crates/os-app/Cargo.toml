@@ -50,7 +50,7 @@ lemon-peak-controller = { path = "../../plugins/lemon-peak-controller", features
 lemon-formula-controller = { path = "../../plugins/lemon-formula-controller", features = ["linked"] }
 lemon-slicer = { path = "../../plugins/lemon-slicer", features = ["linked"] }
 lemon-vocoder = { path = "../../plugins/lemon-vocoder", features = ["linked"] }
-lemon-note-id = { path = "../../plugins/lemon-note-id", features = ["linked"] }
+sample-killer = { path = "../../plugins/sample-killer", features = ["linked"] }
 winit = "0.30"
 softbuffer = "0.4"
 cpal = "0.18"

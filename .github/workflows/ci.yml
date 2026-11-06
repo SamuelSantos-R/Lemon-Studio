@@ -54,14 +54,6 @@ jobs:
         if: runner.os == 'macOS'
         run: cargo run -p bundle-app --locked
 
-      - name: Upload app
-        if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Lemon Studio.app
-          path: target/bundled/Lemon Studio.app
-          retention-days: 7
-
       # Every platform's crates: the notices test lists them with an offline `cargo tree --target all`.
       - name: Fetch
         run: cargo fetch --locked
