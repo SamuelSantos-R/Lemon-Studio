@@ -1144,7 +1144,7 @@ pub fn options_menu(s: &crate::app::State) -> Vec<PItem> {
         b("Send previous to selected channel", BCmd::Send(-1)).key("Shift+Up"),
         b("Send next to selected channel", BCmd::Send(1)).key("Shift+Down"),
         PItem::head("View"),
-        dead("Auto-hide", view::OPT_AUTOHIDE),
+        t("Auto-hide", view::OPT_AUTOHIDE),
         dead("Hide while dragging (when detached)", view::OPT_HIDEDRAG),
         dead("Auto contrast text", view::OPT_CONTRAST),
         PItem::sub("Show icons and text on tabs", vec![PItem::not_yet("Contents not captured yet")]),

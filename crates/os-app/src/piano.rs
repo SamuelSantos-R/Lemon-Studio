@@ -105,6 +105,13 @@ pub struct PianoState {
     pub row_h: f32,
     /// Ghost channels: other channels' notes of the pattern drawn dimmed (§5, Alt+V).
     pub ghosts: bool,
+    /// Scale highlighting (Piano roll options ▸ Helpers): rows outside the scale are dimmed, the root's rows tinted.
+    pub scale_on: bool,
+    /// Its root pitch class (0 = C) and which of [`SCALES`] it is.
+    pub scale_root: u8,
+    pub scale_kind: usize,
+    /// Every key of the keyboard named, not only the Cs.
+    pub all_names: bool,
     /// Random state of the Randomize and humanize tools (§11).
     pub rng: u64,
     /// The grid / event panel split (a program setting, spec: ui/event-panel-splitter.md).
@@ -117,6 +124,34 @@ pub struct PianoState {
     pub snap: crate::snap::EditorSnap,
     sel: Vec<usize>,
     sel_key: (u16, u16),
+}
+
+/// The scales the piano roll can highlight (Piano roll options ▸ Helpers ▸ Scale), as semitones from the root.
+pub const SCALES: [(&str, &[u8]); 10] = [
+    ("Major", &[0, 2, 4, 5, 7, 9, 11]),
+    ("Natural minor", &[0, 2, 3, 5, 7, 8, 10]),
+    ("Harmonic minor", &[0, 2, 3, 5, 7, 8, 11]),
+    ("Melodic minor", &[0, 2, 3, 5, 7, 9, 11]),
+    ("Dorian", &[0, 2, 3, 5, 7, 9, 10]),
+    ("Phrygian", &[0, 1, 3, 5, 7, 8, 10]),
+    ("Phrygian dominant", &[0, 1, 4, 5, 7, 8, 10]),
+    ("Minor pentatonic", &[0, 3, 5, 7, 10]),
+    ("Major pentatonic", &[0, 2, 4, 7, 9]),
+    ("Blues", &[0, 3, 5, 6, 7, 10]),
+];
+
+/// The highlighted scale as (root pitch class, which pitch classes it has), None while highlighting is off.
+pub fn highlight(s: &State) -> Option<(u8, [bool; 12])> {
+    let p = &s.piano;
+    if !p.scale_on {
+        return None;
+    }
+    let (_, ivs) = SCALES[p.scale_kind.min(SCALES.len() - 1)];
+    let mut set = [false; 12];
+    for &iv in ivs {
+        set[(usize::from(p.scale_root) + usize::from(iv)) % 12] = true;
+    }
+    Some((p.scale_root % 12, set))
 }
 
 impl Default for PianoState {
@@ -142,6 +177,10 @@ impl Default for PianoState {
             range: None,
             row_h: ROW,
             ghosts: true,
+            scale_on: false,
+            scale_root: 0,
+            scale_kind: 1,
+            all_names: false,
             rng: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64) | 1,
             split: crate::piano_split::load(),
             split_click: None,
@@ -175,7 +214,7 @@ impl PianoState {
 
     /// Forget everything tied to the previous project.
     pub fn reset(&mut self) {
-        *self = PianoState { px_per_beat: self.px_per_beat, row_h: self.row_h, ghosts: self.ghosts, tool: self.tool, rng: self.rng, split: self.split, snap: self.snap, ..PianoState::default() };
+        *self = PianoState { px_per_beat: self.px_per_beat, row_h: self.row_h, ghosts: self.ghosts, scale_on: self.scale_on, scale_root: self.scale_root, scale_kind: self.scale_kind, all_names: self.all_names, tool: self.tool, rng: self.rng, split: self.split, snap: self.snap, ..PianoState::default() };
     }
 }
 

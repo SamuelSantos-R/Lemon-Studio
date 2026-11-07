@@ -134,6 +134,11 @@ pub enum Cursor {
     NeswResize,
 }
 
+/// Browser auto-hide: how close to the left edge brings the browser back, and how far past it the mouse may go before
+/// it hides (logical px).
+const AUTOHIDE_EDGE: f32 = 3.0;
+const AUTOHIDE_SLACK: f32 = 24.0;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Settings window (spec: ui/settings.md).
@@ -285,6 +290,8 @@ pub enum Action {
     PianoLaneMenu,
     /// Toolbar "Piano roll tools" button: the Tools menu (spec: ui/piano-roll.md §11).
     PianoToolsMenu,
+    /// The title bar's options arrow (and the scale helper button): scale highlighting, key names.
+    PianoOptionsMenu,
     /// Toolbar magnet: the Snap menu; right-click: Stock note lengths (spec: ui/piano-snap.md §1).
     PianoSnapMenu,
     /// The channel name in the title: the channel menu; right-click: channel settings; wheel: channels with notes
@@ -3088,6 +3095,26 @@ impl App {
     /// Docked plugin windows (native children) join `State::z` and are clipped to the workspace minus the drawn
     /// windows above them and the overlays (spec: ui/plugin-window.md "Docking"). Detached windows leave `State::z`.
     #[cfg(plugin_windows)]
+    /// Browser ▸ Auto-hide (FL's): the browser slides away once the mouse leaves it and comes back when the mouse
+    /// touches the main window's left edge below the toolbar. Kept still while a menu or popup is open or a drag runs.
+    fn browser_autohide(&mut self, x: f32, y: f32) {
+        let s = &self.state;
+        if !views::browser::opt(s, views::browser::OPT_AUTOHIDE)
+            || self.drag.is_some()
+            || s.playlist.popup.is_some()
+            || s.menu_open.is_some()
+            || s.surface.is_some()
+            || y < views::work_y(s)
+        {
+            return;
+        }
+        let show = if s.show_browser { x <= views::browser_w(s) + AUTOHIDE_SLACK } else { x <= AUTOHIDE_EDGE };
+        if show != s.show_browser {
+            self.state.show_browser = show;
+            self.invalidate();
+        }
+    }
+
     fn clip_docked(&mut self) {
         let docked = self.plugins.docked();
         self.state.z.retain(|w| !matches!(w, Win::Hosted(r) if !docked.contains(r)));
@@ -3099,7 +3126,9 @@ impl App {
         let k = self.plugins.scale;
         let (ox, oy) = self.canvas_off;
         let px = |r: Rect| [(r.x * k).floor() as i32 + ox, (r.y * k).floor() as i32 + oy, (r.right() * k).ceil() as i32 + ox, (r.bottom() * k).ceil() as i32 + oy];
-        let work = px(self.state.work_rect());
+        // Docked editors may float over the browser, as FL's windows do: their clip starts at the window's left edge.
+        let work = self.state.work_rect();
+        let work = px(Rect::new(0.0, work.y, self.state.screen.0, work.h));
         let over: Vec<[i32; 4]> = self.overlays.iter().map(|&r| px(r.outset(2.0))).collect();
         let z = self.state.z.clone();
         let stacked: Vec<usize> = z.iter().filter_map(|w| if let Win::Hosted(r) = w { Some(*r) } else { None }).collect();
@@ -5802,6 +5831,7 @@ impl App {
     pub fn mouse_move(&mut self, x: f32, y: f32) -> bool {
         self.mouse = (x, y);
         self.hold_moved(x, y);
+        self.browser_autohide(x, y);
         // A drag between windows came onto another surface: its ghost leaves the one it was drawn on.
         if self.cross_drag() && self.state.drag_on != self.state.surface {
             self.state.drag_on = self.state.surface;
@@ -8945,6 +8975,10 @@ impl App {
             Action::PianoToolsMenu => {
                 let (x, y) = self.mouse;
                 s.playlist.popup = Some(crate::piano_tools::tools_menu(s, x - 6.0, y + 10.0));
+            }
+            Action::PianoOptionsMenu => {
+                let (x, y) = self.mouse;
+                s.playlist.popup = Some(crate::piano_tools::options_menu(s, x - 6.0, y + 10.0));
             }
             Action::PianoTarget => {
                 // Top-left 4 px left of the name, 11 px below the title text's centre (spec: ui/piano-target-channel.md §2).

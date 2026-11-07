@@ -42,6 +42,11 @@ pub enum NCmd {
     StockLength(crate::playlist::Snap),
     /// Make a channel rack row the piano roll's channel (the title's channel menu).
     Target(usize),
+    /// Piano roll options ▸ Helpers: scale highlighting on / off, its root, its scale; every key named.
+    ScaleOn,
+    ScaleRoot(u8),
+    ScaleKind(usize),
+    AllNames,
 }
 
 fn item(label: &'static str, c: NCmd) -> PItem {
@@ -79,6 +84,24 @@ pub fn tools_menu(s: &State, x: f32, y: f32) -> Popup {
         PItem::head("View"),
         item("Ghost channels", Ghosts).key("Alt+V").mark(Mark::Check(s.piano.ghosts)),
         item("Add time marker", AddMarker).key("Alt+T"),
+    ];
+    Popup { x, y, items, sub: None, scroll: [0; 2] }
+}
+
+/// The options menu (the title bar's arrow): FL's helpers, scale highlighting and key names, and the view toggles.
+pub fn options_menu(s: &State, x: f32, y: f32) -> Popup {
+    use NCmd::*;
+    let p = &s.piano;
+    let roots = (0..12u8).map(|pc| item(crate::views::piano::PC_NAMES[usize::from(pc)], ScaleRoot(pc)).mark(Mark::Radio(p.scale_root == pc))).collect();
+    let kinds = piano::SCALES.iter().enumerate().map(|(i, (name, _))| item(name, ScaleKind(i)).mark(Mark::Radio(p.scale_kind == i))).collect();
+    let items = vec![
+        PItem::head("Helpers"),
+        item("Scale highlighting", ScaleOn).mark(Mark::Check(p.scale_on)),
+        PItem::sub(format!("Root: {}", crate::views::piano::PC_NAMES[usize::from(p.scale_root % 12)]), roots),
+        PItem::sub(format!("Scale: {}", piano::SCALES[p.scale_kind.min(piano::SCALES.len() - 1)].0), kinds),
+        item("Show all key names", AllNames).mark(Mark::Check(p.all_names)),
+        PItem::head("View"),
+        item("Ghost channels", Ghosts).key("Alt+V").mark(Mark::Check(p.ghosts)),
     ];
     Popup { x, y, items, sub: None, scroll: [0; 2] }
 }
@@ -344,6 +367,24 @@ pub fn run(app: &mut App, cmd: NCmd) -> Option<String> {
             let tick = if app.transport.playing() && !app.transport.song() { app.transport.tick() as u32 } else { app.state.piano.marker };
             return Some(add_marker(&mut app.state, tick));
         }
+        NCmd::ScaleOn => {
+            s.piano.scale_on = !s.piano.scale_on;
+            scale_msg(s)
+        }
+        NCmd::ScaleRoot(pc) => {
+            s.piano.scale_root = pc % 12;
+            s.piano.scale_on = true;
+            scale_msg(s)
+        }
+        NCmd::ScaleKind(i) => {
+            s.piano.scale_kind = i.min(piano::SCALES.len() - 1);
+            s.piano.scale_on = true;
+            scale_msg(s)
+        }
+        NCmd::AllNames => {
+            s.piano.all_names = !s.piano.all_names;
+            format!("Key names: {}", if s.piano.all_names { "all keys" } else { "C only" })
+        }
         NCmd::Snap(p) => return Some(crate::piano_snap::set(s, p)),
         NCmd::StockLength(sn) => return Some(crate::piano_snap::set_length(s, sn)),
         NCmd::Target(row) => {
@@ -513,6 +554,16 @@ pub(crate) fn next(rng: &mut u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
     z ^ (z >> 31)
+}
+
+
+fn scale_msg(s: &State) -> String {
+    let p = &s.piano;
+    if p.scale_on {
+        format!("Scale highlighting: {} {}", crate::views::piano::PC_NAMES[usize::from(p.scale_root % 12)], piano::SCALES[p.scale_kind.min(piano::SCALES.len() - 1)].0)
+    } else {
+        "Scale highlighting off".to_string()
+    }
 }
 
 #[cfg(test)]

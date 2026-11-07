@@ -110,34 +110,30 @@ impl Logic {
         } else {
             None
         };
-        let hz = load_f32(&sh.live_hz);
-        let (live_midi, live_cents) = if hz > 0.0 {
-            let m = 69.0 + 12.0 * (hz / 440.0).log2();
-            let r = m.round().clamp(0.0, 127.0);
-            (Some(r as u8), (m - r) * 100.0)
-        } else {
-            (None, 0.0)
-        };
         let level = load_f32(&sh.level);
         let level = if level > 0.0 { ((20.0 * level.log10() + 60.0) / 60.0).clamp(0.0, 1.0) } else { 0.0 };
+        let usage: [f32; 12] = std::array::from_fn(|i| load_f32(&sh.chroma[i]));
+        let octave = self.params.octave.value();
+        let relative = root.map(|r| {
+            let (pc, mode) = if scale.minor { ((r + 3) % 12, "major") } else { ((r + 9) % 12, "minor") };
+            format!("{} {mode}", theory::NOTE_NAMES[pc as usize])
+        });
         ViewState {
             key_root: root,
             key_minor: scale.minor,
+            relative,
             root_locked: hand_root > 0,
             confidence: load_f32(&sh.confidence),
-            chroma: std::array::from_fn(|i| load_f32(&sh.chroma[i])),
-            live_midi,
-            live_freq: hz,
-            live_cents,
             level,
             scale_name: match (scale_i, scale.minor) {
                 (0, true) => "Auto (Natural Minor)",
                 (0, false) => "Auto (Major)",
                 _ => scale.name,
             },
+            octave,
             hold: self.params.hold.value(),
-            bass: root.map(|r| theory::bass_notes(r, scale)).unwrap_or_default(),
-            melody: root.map(|r| theory::melody_notes(r, scale)).unwrap_or_default(),
+            bass: root.map(|r| theory::bass_notes(r, scale, octave, &usage)).unwrap_or_default(),
+            melody: root.map(|r| theory::melody_notes(r, scale, octave, &usage)).unwrap_or_default(),
             hover: self.hover,
         }
     }
@@ -177,6 +173,8 @@ impl Logic {
                 self.set_int(&p.root, (cur + step).rem_euclid(12) + 1);
             }
             Hit::RootAuto => self.set_int(&p.root, 0),
+            Hit::OctaveDown => self.set_int(&p.octave, (p.octave.value() - 1).max(3)),
+            Hit::OctaveUp => self.set_int(&p.octave, (p.octave.value() + 1).min(7)),
             Hit::Hold => {
                 let setter = ParamSetter::new(self.ctx.as_ref());
                 setter.begin_set_parameter(&p.hold);

@@ -25,6 +25,9 @@ pub fn key_name(key: i32) -> String {
     crate::note_names::note_name(key)
 }
 
+/// Pitch class names (sharps), C first.
+pub const PC_NAMES: [&str; 12] = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 pub fn is_black(key: i32) -> bool {
     matches!(key.rem_euclid(12), 1 | 3 | 6 | 8 | 10)
 }
@@ -161,8 +164,9 @@ pub fn paint(ui: &mut Ui, s: &State, r: Rect, f: &FrameInfo) {
     lit.extend(s.piano.typed.iter().filter(|&&(c, _)| Some(c) == ch).map(|&(_, k)| k));
     lit.extend(f.sounding.iter().filter(|&&(c, _)| Some(c) == ch).map(|&(_, k)| i32::from(k)));
     ui.live(Live::Sounding, l.keys);
-    keyboard(ui, &l, &g, &lit);
-    grid(ui, &l, &g, range);
+    let scale = crate::piano::highlight(s);
+    keyboard(ui, &l, &g, &lit, s.piano.all_names, scale);
+    grid(ui, &l, &g, range, scale);
 
     // Notes: ghosts of the other channels first (when shown, Alt+V), then this channel's (§5).
     ui.hit(l.grid, Action::PianoGrid, "Piano roll: click to add a note, drag a note to move it or its end to resize, right-click to delete");
@@ -348,11 +352,11 @@ fn toolbar(ui: &mut Ui, s: &State, r: Rect, shift: f32) {
     let active = s.piano.tool;
     let ox = r.x - 209.0 + shift;
     let items: [(f32, Icon, &'static str, Option<Action>); 15] = [
-        (222.0, Icon::ArrowRight, "Piano roll options", None),
+        (222.0, Icon::ArrowRight, "Piano roll options: scale highlighting, key names", Some(Action::PianoOptionsMenu)),
         (242.0, Icon::MidiControl, "Piano roll tools: quantize, chop, glue, strum, arpeggiate, randomize...", Some(Action::PianoToolsMenu)),
         (263.0, Icon::Magnet, "", Some(Action::PianoSnapMenu)),
         (283.0, Icon::Note, "Note properties", None),
-        (305.0, Icon::Blend, "Scale and chord helpers", None),
+        (305.0, Icon::Blend, "Scale and chord helpers: highlight a scale's rows", Some(Action::PianoOptionsMenu)),
         (327.0, Icon::Undo, "Undo (Ctrl+Z)", Some(Action::PianoUndo)),
         (360.0, Icon::Pencil, "Draw (P)", Some(Action::PianoTool(Tool::Draw))),
         (380.0, Icon::Brush, "Paint (B): drag to paint notes along the row", Some(Action::PianoTool(Tool::Paint))),
@@ -474,7 +478,7 @@ fn ruler(ui: &mut Ui, l: &Layout, g: &Geom, range: Option<(f32, f32)>, marker: u
     ui.c.pop_clip();
 }
 
-fn keyboard(ui: &mut Ui, l: &Layout, g: &Geom, lit: &[i32]) {
+fn keyboard(ui: &mut Ui, l: &Layout, g: &Geom, lit: &[i32], all_names: bool, scale: Option<(u8, [bool; 12])>) {
     let t = ui.t;
     let k = l.keys;
     ui.hit(k, Action::PianoKeys, "Keyboard");
@@ -543,6 +547,19 @@ fn keyboard(ui: &mut Ui, l: &Layout, g: &Geom, lit: &[i32]) {
             }
         }
     }
+    // Every key's name (Piano roll options ▸ Show all key names), the Cs already have theirs; the highlighted scale's
+    // keys are named in full ink, the others faint.
+    if all_names && row >= 10.0 {
+        for key in (lo..=hi).filter(|k| k.rem_euclid(12) != 0) {
+            let y = g.y_of(key) + 1.0 + (row - ROW) / 2.0;
+            let pc = key.rem_euclid(12) as usize;
+            let dim = scale.is_some_and(|(_, set)| !set[pc]);
+            let ink = if is_black(key) { t.key_white } else { t.key_label };
+            let ink = if dim { ink.with_alpha(90) } else { ink };
+            let right = if is_black(key) { k.x + 40.0 } else { k.right() - 4.0 };
+            ui.c.text_right(Font::new(11), right, y, ink, &key_name(key));
+        }
+    }
     ui.c.pop_clip();
     // Divider between keyboard and grid.
     ui.c.fill_rect(Rect::new(k.right(), l.grid.y, 1.0, k.h), ui.t.s(0x131718));
@@ -578,18 +595,18 @@ fn columns(ui: &mut Ui, g: &Geom, area: Rect, bands: &[(f32, f32, Color)], bar: 
     }
 }
 
-fn grid(ui: &mut Ui, l: &Layout, g: &Geom, range: Option<(f32, f32)>) {
-    grid_rows(ui, l, g, l.grid, false);
+fn grid(ui: &mut Ui, l: &Layout, g: &Geom, range: Option<(f32, f32)>, scale: Option<(u8, [bool; 12])>) {
+    grid_rows(ui, l, g, l.grid, false, scale);
     if let Some((x0, x1)) = range {
         let r = Rect::span(x0, x1, l.grid.y, l.grid.bottom()).intersect(&l.grid);
         if r.w > 0.0 {
-            grid_rows(ui, l, g, r, true);
+            grid_rows(ui, l, g, r, true, scale);
         }
     }
 }
 
 /// The note-grid rows and columns, clipped to `clip` (`selecting` = the red time-selection tint).
-fn grid_rows(ui: &mut Ui, l: &Layout, g: &Geom, clip: Rect, selecting: bool) {
+fn grid_rows(ui: &mut Ui, l: &Layout, g: &Geom, clip: Rect, selecting: bool, scale: Option<(u8, [bool; 12])>) {
     let t = ui.t;
     let gr = l.grid;
     let (white, black) = if selecting { (t.pr_row_sel, t.pr_row_black_sel) } else { (t.pr_row, t.pr_row_black) };
@@ -599,6 +616,13 @@ fn grid_rows(ui: &mut Ui, l: &Layout, g: &Geom, clip: Rect, selecting: bool) {
     for key in lo..=hi {
         let y = g.y_of(key);
         let fill = if is_black(key) { black } else { white };
+        // Scale highlighting: rows outside the scale sink, the root's rows take the lit-key tint.
+        let pc = key.rem_euclid(12) as usize;
+        let fill = match scale {
+            Some((root, _)) if pc == usize::from(root) => fill.mix(t.key_lit, 0.22),
+            Some((_, set)) if !set[pc] => fill.shade(-0.28),
+            _ => fill,
+        };
         ui.c.fill_rect(Rect::new(gr.x, y, gr.w, g.row - 1.0), fill);
         ui.c.fill_rect(Rect::new(gr.x, y + g.row - 1.0, gr.w, 1.0), sub(t, white, 0x0a));
         bands.push((y, g.row - 1.0, fill));
