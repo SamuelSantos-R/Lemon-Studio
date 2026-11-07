@@ -21820,7 +21820,7 @@ mod tests {
             for it in m.cols.iter().flat_map(|(_, items)| items.iter()).filter(|it| matches!(it.kind, Kind::Item)) {
                 let Some(h) = app.hits.iter().rev().find(|h| h.hint == it.label || h.action == Action::Placeholder(it.label)) else { continue };
                 let label = c.text_width(f, &label_now(&app.state, menu, it));
-                let key = if it.shortcut.is_empty() { 0.0 } else { c.text_width(f.italic(), shortcut_now(it)) + 4.0 };
+                let key = if it.shortcut.is_empty() { 0.0 } else { c.text_width(f.italic(), crate::shortcuts::mac_key(shortcut_now(it))) + 4.0 };
                 let end = h.rect.right() - if it.sub { 13.0 } else { 8.0 } - key;
                 assert!(h.rect.x + 20.0 + label <= end, "{}: {:?} ends at {} past {end}", m.title, it.label, h.rect.x + 20.0 + label);
             }

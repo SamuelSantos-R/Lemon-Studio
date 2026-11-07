@@ -818,7 +818,7 @@ pub fn paint_dropdown(ui: &mut Ui, s: &State, menu: usize, k: f32) {
         let f = Font::new(14);
         let mut need = *w;
         for it in items.iter().filter(|it| matches!(it.kind, Kind::Item) && in_menu(s, menu, it)) {
-            let key = if it.shortcut.is_empty() { 0.0 } else { ui.c.text_width(f.italic(), shortcut_now(it)) + 16.0 };
+            let key = if it.shortcut.is_empty() { 0.0 } else { ui.c.text_width(f.italic(), crate::shortcuts::mac_key(shortcut_now(it))) + 16.0 };
             need = need.max(20.0 + ui.c.text_width(f, &label_now(s, menu, it)) + key + if it.sub { 18.0 } else { 8.0 });
         }
         if has_recent(items) {
@@ -939,7 +939,7 @@ pub fn paint_dropdown(ui: &mut Ui, s: &State, menu: usize, k: f32) {
                             }
                             _ => {}
                         }
-                        let key = if item.shortcut.is_empty() { "" } else { shortcut_now(item) };
+                        let key = if item.shortcut.is_empty() { "" } else { crate::shortcuts::mac_key(shortcut_now(item)) };
                         let caption = s.motion.borrow().caption(Slot::Dropdown, lit.next());
                         row_text(ui, rr, &label_now(s, menu, item), key, item.sub, ok, caption);
                     }

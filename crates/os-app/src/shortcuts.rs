@@ -169,6 +169,28 @@ pub fn clip_double_click(alt: bool) -> Option<ClipOpen> {
 /// The key a menu shows beside an entry, its `shortcut` as written: the F8 keys of the browser and the pickers follow
 /// the applied shortcuts.
 pub fn menu_key(label: &str, shortcut: &'static str) -> &'static str {
+    menu_key_raw(label, shortcut)
+}
+
+/// macOS writes Command and Option where the shortcut tables say Ctrl and Alt (Ctrl is Command there, see `ctrl` in
+/// main.rs). Each distinct shortcut is converted once and kept.
+#[cfg(target_os = "macos")]
+pub fn mac_key(shortcut: &'static str) -> &'static str {
+    use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+    static SEEN: OnceLock<Mutex<HashMap<&'static str, &'static str>>> = OnceLock::new();
+    if !shortcut.contains("Ctrl") && !shortcut.contains("Alt") {
+        return shortcut;
+    }
+    let mut seen = SEEN.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
+    seen.entry(shortcut).or_insert_with(|| Box::leak(shortcut.replace("Ctrl", "Cmd").replace("Alt", "Opt").into_boxed_str()))
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn mac_key(shortcut: &'static str) -> &'static str {
+    shortcut
+}
+
+fn menu_key_raw(label: &str, shortcut: &'static str) -> &'static str {
     let c = match label {
         "Browser" => &TOGGLE_BROWSER,
         "Plugin palette" => &TOGGLE_PLUGIN_PICKER,

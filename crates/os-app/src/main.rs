@@ -229,6 +229,8 @@ struct Shell {
     watchdog: std::sync::Arc<stall::Watchdog>,
     /// macOS: the left button went down with Control held, which is a right click there; its release is one too.
     ctrl_click: bool,
+    /// macOS: the trackpad's pinch not yet turned into whole wheel notches (a pinch zooms like Command + wheel).
+    pinch: f64,
     /// The main window's restored frame and whether it is maximized, kept for the next start as the app closes
     /// (`layout`): the last run's at first, then followed as the window moves and resizes (`follow_frame`).
     main_win: Option<layout::MainWin>,
@@ -294,9 +296,10 @@ fn paced(frame: Duration, animating: bool) -> Duration {
 /// (Counting `FRAME` from the end of a frame instead held everything to 16 ms plus the paint: 30-45 fps.)
 const IDLE: Duration = Duration::from_millis(4);
 
-/// The app's Ctrl: the Control key, and on macOS the Command key (Command + S saves there).
+/// The app's Ctrl: the Control key, and on macOS only the Command key (Command + S saves there; Control is its own key
+/// there, which with a click is a right click).
 fn ctrl(m: ModifiersState) -> bool {
-    m.control_key() || (cfg!(target_os = "macos") && m.super_key())
+    if cfg!(target_os = "macos") { m.super_key() } else { m.control_key() }
 }
 
 #[derive(Clone, Copy)]
@@ -580,7 +583,7 @@ impl Shell {
 
     /// The app's modifier flags from the keyboard's.
     fn sync_mods(&mut self) {
-        self.app.ctrl = ctrl(self.mods) && !(self.ctrl_click && !self.mods.super_key());
+        self.app.ctrl = ctrl(self.mods);
         self.app.shift = self.mods.shift_key();
         self.app.alt = self.mods.alt_key();
         self.app.rshift &= self.app.shift;
@@ -884,7 +887,7 @@ impl ApplicationHandler for Shell {
         let press = match &event {
             WindowEvent::MouseInput { state, .. } => *state == ElementState::Pressed,
             WindowEvent::KeyboardInput { event, .. } => event.state == ElementState::Pressed,
-            WindowEvent::MouseWheel { .. } | WindowEvent::DroppedFile(_) => true,
+            WindowEvent::MouseWheel { .. } | WindowEvent::PinchGesture { .. } | WindowEvent::DroppedFile(_) => true,
             _ => false,
         };
         if press && self.app.loading() {
@@ -1050,6 +1053,19 @@ impl ApplicationHandler for Shell {
                 self.unlock_cursor();
                 self.app.mouse_up_from(None);
                 self.pending = true;
+            }
+            // macOS trackpad pinch: whole notches of the Ctrl + wheel zoom (the piano roll's and playlist's).
+            WindowEvent::PinchGesture { delta, phase, .. } => {
+                if phase == winit::event::TouchPhase::Started {
+                    self.pinch = 0.0;
+                }
+                self.pinch += delta;
+                let notches = (self.pinch / 0.1).trunc();
+                if notches != 0.0 {
+                    self.pinch -= notches * 0.1;
+                    self.app.wheel(0.0, notches as f32, false, true);
+                    self.pending = true;
+                }
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let (dx, dy) = match delta {
@@ -1993,6 +2009,7 @@ fn main() {
         frames: FrameLog::open(),
         watchdog,
         ctrl_click: false,
+        pinch: 0.0,
         main_win: layout::main_win(),
         detached: Vec::new(),
         key_on: None,
